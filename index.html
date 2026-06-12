@@ -41,6 +41,18 @@
   }
   .tab.active { font-weight: 700; }
   main { max-width: 680px; margin: 0 auto; padding: 14px 14px 40px; }
+  .searchbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .searchbar input {
+    flex: 1; border: 1px solid #CFD3D0; border-radius: 6px; padding: 8px 12px;
+    font-size: 14px; font-family: inherit; background: #fff; color: var(--ink);
+  }
+  .searchbar input:focus { outline: 2px solid var(--ai); outline-offset: 0; border-color: var(--ai); }
+  #qbtn {
+    border: none; background: var(--ai); color: #fff; border-radius: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .search-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+  .search-head .back { border: none; background: transparent; color: var(--shu); font-weight: 700; cursor: pointer; font-size: 13px; font-family: inherit; }
   .controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .chips { display: flex; gap: 6px; }
   .chip {
@@ -94,6 +106,10 @@
 <nav><div class="tabs" id="tabs"></div></nav>
 
 <main>
+  <div class="searchbar">
+    <input type="search" id="q" placeholder="キーワードで検索（例: 相続税、ANA）" enterkeyhint="search">
+    <button id="qbtn">検索</button>
+  </div>
   <div class="controls">
     <div class="chips" id="chips"></div>
     <button id="refresh">最新に更新</button>
@@ -109,6 +125,7 @@ const GENRES = [
   { id: "top",      label: "総合",     topic: null,            color: "#19324F" },
   { id: "domestic", label: "国内",     topic: "NATION",        color: "#2D5F4E" },
   { id: "world",    label: "国際",     topic: "WORLD",         color: "#6A4C93" },
+  { id: "kyoto",    label: "京都",     geo: "京都",            color: "#6B7C3A" },
   { id: "biz",      label: "経済",     topic: "BUSINESS",      color: "#8C5E2A" },
   { id: "tech",     label: "テック",   topic: "TECHNOLOGY",    color: "#1D6A8C" },
   { id: "sports",   label: "スポーツ", topic: "SPORTS",        color: "#A8442E" },
@@ -121,12 +138,17 @@ const PROXIES = [
 ];
 const FOREIGN_RE = /BBC|CNN|ロイター|Reuters|AFP|Bloomberg|ブルームバーグ|WSJ|ウォール・ストリート|ニューヨーク・タイムズ|New York Times|Forbes|フォーブス|ガーディアン|Guardian|新華社|人民網|中央日報|朝鮮日報|聯合ニュース|ESPN|TechCrunch|The Verge|CNBC|フィナンシャル/i;
 
-const state = { active: "top", region: "すべて", store: {}, loading: false };
+const state = { active: "top", region: "すべて", store: {}, loading: false, mode: "genre", query: "" };
 
+const COMMON = "hl=ja&gl=JP&ceid=JP:ja";
 function feedUrl(g) {
+  if (g.geo) return `https://news.google.com/rss/headlines/section/geo/${encodeURIComponent(g.geo)}?${COMMON}`;
   return g.topic
-    ? `https://news.google.com/rss/headlines/section/topic/${g.topic}?hl=ja&gl=JP&ceid=JP:ja`
-    : "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja";
+    ? `https://news.google.com/rss/headlines/section/topic/${g.topic}?${COMMON}`
+    : `https://news.google.com/rss?${COMMON}`;
+}
+function searchUrl(q) {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&${COMMON}`;
 }
 
 function timeAgo(d) {
@@ -140,11 +162,11 @@ function timeAgo(d) {
   return Math.floor(h / 24) + "日前";
 }
 
-async function fetchItems(genre) {
+async function fetchItems(url) {
   let xml = null, lastErr = null;
   for (const proxy of PROXIES) {
     try {
-      const res = await fetch(proxy(feedUrl(genre)));
+      const res = await fetch(proxy(url));
       if (!res.ok) throw new Error("HTTP " + res.status);
       const text = await res.text();
       if (text.includes("<item")) { xml = text; break; }
@@ -170,84 +192,127 @@ function esc(s) {
   return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 }
 
+function currentKey() {
+  return state.mode === "search" ? "search:" + state.query : state.active;
+}
+function currentColor() {
+  return state.mode === "search" ? "#19324F" : GENRES.find(x => x.id === state.active).color;
+}
+function currentLabel() {
+  return state.mode === "search" ? `「${state.query}」` : GENRES.find(x => x.id === state.active).label;
+}
+
 function render() {
-  const g = GENRES.find(x => x.id === state.active);
-  // タブ
-  document.getElementById("tabs").innerHTML = GENRES.map(x =>
-    `<button class="tab${x.id === state.active ? " active" : ""}" data-id="${x.id}"
-       style="${x.id === state.active ? `color:${x.color};border-bottom-color:${x.color}` : ""}">${x.label}</button>`
-  ).join("");
+  const color = currentColor();
+  // タブ（検索モード中はどれも非選択表示）
+  document.getElementById("tabs").innerHTML = GENRES.map(x => {
+    const on = state.mode === "genre" && x.id === state.active;
+    return `<button class="tab${on ? " active" : ""}" data-id="${x.id}"
+       style="${on ? `color:${x.color};border-bottom-color:${x.color}` : ""}">${x.label}</button>`;
+  }).join("");
   // 絞り込みチップ
   document.getElementById("chips").innerHTML = REGIONS.map(r =>
-    `<button class="chip" data-r="${r}" style="${r === state.region ? `background:${g.color};color:#fff;border-color:${g.color}` : ""}">${r}</button>`
+    `<button class="chip" data-r="${r}" style="${r === state.region ? `background:${color};color:#fff;border-color:${color}` : ""}">${r}</button>`
   ).join("");
   // 本体
   const box = document.getElementById("content");
-  const entry = state.store[state.active];
-  document.getElementById("updated").textContent = entry ? entry.updatedAt + " 更新" : "";
+  const entry = state.store[currentKey()];
+  document.getElementById("updated").textContent = entry && entry.updatedAt ? entry.updatedAt + " 更新" : "";
   document.getElementById("refresh").disabled = state.loading;
 
+  // 検索結果の見出し行
+  const head = state.mode === "search"
+    ? `<div class="search-head"><span>${esc(state.query)} の検索結果</span><button class="back" id="backbtn">× 検索を終了</button></div>`
+    : "";
+
   if (state.loading) {
-    box.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
-      <p class="state">「${g.label}」の最新ニュースを取得しています…</p>`;
+    box.innerHTML = head + `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      <p class="state">${esc(currentLabel())}の最新ニュースを取得しています…</p>`;
+    bindBack();
     return;
   }
   if (entry && entry.error) {
-    box.innerHTML = `<div class="state">取得できませんでした：${esc(entry.error)}<br>
+    box.innerHTML = head + `<div class="state">取得できませんでした：${esc(entry.error)}<br>
       <button id="retry">もう一度試す</button></div>`;
-    document.getElementById("retry").onclick = () => load(state.active, true);
+    document.getElementById("retry").onclick = () => load(true);
+    bindBack();
     return;
   }
-  if (!entry) { load(state.active); return; }
+  if (!entry) { load(); return; }
 
   const items = entry.items.filter(it => state.region === "すべて" || it.r === state.region);
   if (!items.length) {
-    box.innerHTML = `<p class="state">この絞り込みに合う記事がありません。「すべて」に戻すか、最新に更新してください。</p>`;
+    box.innerHTML = head + `<p class="state">${state.mode === "search" ? "該当する記事が見つかりませんでした。別の語句でお試しください。" : "この絞り込みに合う記事がありません。「すべて」に戻すか、最新に更新してください。"}</p>`;
+    bindBack();
     return;
   }
-  box.innerHTML = items.map(it => `
+  box.innerHTML = head + items.map(it => `
     <article class="card">
       <div class="vtag" style="${it.r === "海外"
-        ? `background:${g.color};color:#fff;border-right:1px solid ${g.color}`
-        : `background:#fff;color:${g.color};border-right:1px solid ${g.color}`}">${it.r}</div>
+        ? `background:${color};color:#fff;border-right:1px solid ${color}`
+        : `background:#fff;color:${color};border-right:1px solid ${color}`}">${it.r}</div>
       <div class="card-body">
         <h2>${it.u ? `<a href="${esc(it.u)}" target="_blank" rel="noopener noreferrer">${esc(it.t)}</a>` : esc(it.t)}</h2>
         <p class="fresh">${esc(it.time)}</p>
-        <p class="meta">${esc(it.src)}${it.u ? `<a href="${esc(it.u)}" target="_blank" rel="noopener noreferrer" style="color:${g.color}">元記事へ →</a>` : ""}</p>
+        <p class="meta">${esc(it.src)}${it.u ? `<a href="${esc(it.u)}" target="_blank" rel="noopener noreferrer" style="color:${color}">元記事へ →</a>` : ""}</p>
       </div>
     </article>`).join("");
+  bindBack();
 }
 
-async function load(id, force) {
-  if (state.store[id] && !force && !state.store[id].error) { render(); return; }
+function bindBack() {
+  const b = document.getElementById("backbtn");
+  if (b) b.onclick = () => {
+    state.mode = "genre"; state.query = "";
+    document.getElementById("q").value = "";
+    render();
+  };
+}
+
+async function load(force) {
+  const key = currentKey();
+  if (state.store[key] && !force && !state.store[key].error) { render(); return; }
   state.loading = true; render();
   try {
-    const g = GENRES.find(x => x.id === id);
-    const items = await fetchItems(g);
+    const url = state.mode === "search"
+      ? searchUrl(state.query)
+      : feedUrl(GENRES.find(x => x.id === state.active));
+    const items = await fetchItems(url);
     const now = new Date();
-    state.store[id] = {
+    state.store[key] = {
       items,
       updatedAt: now.getHours() + ":" + String(now.getMinutes()).padStart(2, "0"),
     };
   } catch (e) {
-    state.store[id] = { error: (e && e.message) || "不明なエラー", items: [] };
+    state.store[key] = { error: (e && e.message) || "不明なエラー", items: [] };
   } finally {
     state.loading = false; render();
   }
 }
 
+function doSearch() {
+  const q = document.getElementById("q").value.trim();
+  if (!q) return;
+  state.mode = "search"; state.query = q;
+  document.getElementById("q").blur();
+  load();
+}
+
 document.getElementById("tabs").addEventListener("click", e => {
   const b = e.target.closest(".tab"); if (!b) return;
-  state.active = b.dataset.id; render();
-  if (!state.store[state.active]) load(state.active);
+  state.mode = "genre"; state.active = b.dataset.id;
+  render();
+  if (!state.store[state.active]) load();
 });
 document.getElementById("chips").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;
   state.region = b.dataset.r; render();
 });
-document.getElementById("refresh").addEventListener("click", () => load(state.active, true));
+document.getElementById("refresh").addEventListener("click", () => load(true));
+document.getElementById("qbtn").addEventListener("click", doSearch);
+document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
 
-load("top");
+load();
 
 // PWA: サービスワーカー登録（対応環境のみ・失敗しても本体動作に影響なし）
 if ("serviceWorker" in navigator) {

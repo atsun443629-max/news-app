@@ -1,6 +1,6 @@
 // 内外ワイヤー Service Worker
 // アプリ本体（シェル）はキャッシュから即時表示し、ニュースは常にネットワークから取得する
-const CACHE = "naigai-wire-v1";
+const CACHE = "naigai-wire-v2";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
