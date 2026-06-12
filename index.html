@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内外ワイヤー｜世界のニュースを、日本語で。</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#19324F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="内外ワイヤー">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ai: #19324F;      /* 藍 */
+    --shu: #C73E3A;     /* 朱 */
+    --paper: #F4F5F4;
+    --ink: #22272E;
+    --sub: #5A6068;
+    --line: #E7E9E7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: 'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif;
+  }
+  header { background: var(--ai); color: #F4F5F4; padding: 18px 16px 14px; }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  .head-row { display: flex; align-items: baseline; justify-content: space-between; }
+  h1 { font-family: 'Shippori Mincho B1',serif; font-weight: 800; font-size: 26px; margin: 0; letter-spacing: .08em; }
+  h1 .accent { color: #E0625C; }
+  .tagline { margin: 2px 0 0; font-size: 11px; opacity: .75; letter-spacing: .15em; }
+  #updated { font-size: 11px; opacity: .8; }
+  nav { background: #fff; border-bottom: 1px solid #E0E2E0; position: sticky; top: 0; z-index: 10; }
+  .tabs { display: flex; overflow-x: auto; padding: 0 8px; max-width: 680px; margin: 0 auto; }
+  .tab {
+    flex: 0 0 auto; border: none; background: transparent; cursor: pointer;
+    padding: 12px 14px; font-size: 14px; font-weight: 500; color: var(--sub);
+    border-bottom: 3px solid transparent; font-family: inherit;
+  }
+  .tab.active { font-weight: 700; }
+  main { max-width: 680px; margin: 0 auto; padding: 14px 14px 40px; }
+  .controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .chips { display: flex; gap: 6px; }
+  .chip {
+    border: 1px solid #CFD3D0; background: #fff; color: var(--sub);
+    border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  #refresh {
+    border: 1px solid var(--ai); background: #fff; color: var(--ai);
+    border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  #refresh:disabled { opacity: .5; cursor: wait; }
+  .card {
+    display: flex; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    margin-bottom: 10px; overflow: hidden; animation: fadein .35s ease both;
+  }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+  .vtag {
+    writing-mode: vertical-rl; letter-spacing: .35em; font-size: 11px; font-weight: 700;
+    padding: 10px 5px; text-align: center; flex: 0 0 auto;
+    font-family: 'Shippori Mincho B1',serif;
+  }
+  .card-body { padding: 10px 12px; flex: 1; min-width: 0; }
+  .card h2 { font-family: 'Shippori Mincho B1',serif; font-size: 15.5px; font-weight: 600; margin: 0 0 4px; line-height: 1.45; }
+  .card h2 a { color: var(--ink); text-decoration: none; }
+  .meta { font-size: 11px; color: #8A9098; margin: 0; }
+  .meta a { margin-left: 8px; font-weight: 700; text-decoration: none; }
+  .fresh { font-size: 12px; color: var(--sub); margin: 0 0 6px; }
+  .state { text-align: center; padding: 30px 0; font-size: 13px; color: var(--sub); line-height: 1.8; }
+  .state button {
+    border: none; background: var(--shu); color: #fff; border-radius: 6px;
+    padding: 8px 18px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px;
+  }
+  .skeleton { background: #fff; border: 1px solid var(--line); border-radius: 8px; height: 80px; margin-bottom: 10px; opacity: .6; }
+  footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #E0E2E0; font-size: 11px; color: #8A9098; line-height: 1.7; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head-row">
+    <div>
+      <h1>内外<span class="accent">ワイヤー</span></h1>
+      <p class="tagline">世界のニュースを、日本語で。</p>
+    </div>
+    <span id="updated"></span>
+  </div>
+</header>
+
+<nav><div class="tabs" id="tabs"></div></nav>
+
+<main>
+  <div class="controls">
+    <div class="chips" id="chips"></div>
+    <button id="refresh">最新に更新</button>
+  </div>
+  <div id="content"></div>
+  <footer>
+    プロトタイプ版：Google Newsのジャンル別RSS（日本語版）から見出し・媒体名・公開時刻を取得し、本文は元記事リンク先で読む構成です（著作権配慮）。通信はCORS中継サービスを経由しています。本番ではPWA化と自前バックエンドへの移行を予定。
+  </footer>
+</main>
+
+<script>
+const GENRES = [
+  { id: "top",      label: "総合",     topic: null,            color: "#19324F" },
+  { id: "domestic", label: "国内",     topic: "NATION",        color: "#2D5F4E" },
+  { id: "world",    label: "国際",     topic: "WORLD",         color: "#6A4C93" },
+  { id: "biz",      label: "経済",     topic: "BUSINESS",      color: "#8C5E2A" },
+  { id: "tech",     label: "テック",   topic: "TECHNOLOGY",    color: "#1D6A8C" },
+  { id: "sports",   label: "スポーツ", topic: "SPORTS",        color: "#A8442E" },
+  { id: "ent",      label: "エンタメ", topic: "ENTERTAINMENT", color: "#9C3D63" },
+];
+const REGIONS = ["すべて", "国内", "海外"];
+const PROXIES = [
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  u => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+];
+const FOREIGN_RE = /BBC|CNN|ロイター|Reuters|AFP|Bloomberg|ブルームバーグ|WSJ|ウォール・ストリート|ニューヨーク・タイムズ|New York Times|Forbes|フォーブス|ガーディアン|Guardian|新華社|人民網|中央日報|朝鮮日報|聯合ニュース|ESPN|TechCrunch|The Verge|CNBC|フィナンシャル/i;
+
+const state = { active: "top", region: "すべて", store: {}, loading: false };
+
+function feedUrl(g) {
+  return g.topic
+    ? `https://news.google.com/rss/headlines/section/topic/${g.topic}?hl=ja&gl=JP&ceid=JP:ja`
+    : "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja";
+}
+
+function timeAgo(d) {
+  const t = new Date(d).getTime();
+  if (isNaN(t)) return "";
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return "たった今";
+  if (m < 60) return m + "分前";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "時間前";
+  return Math.floor(h / 24) + "日前";
+}
+
+async function fetchItems(genre) {
+  let xml = null, lastErr = null;
+  for (const proxy of PROXIES) {
+    try {
+      const res = await fetch(proxy(feedUrl(genre)));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+      if (text.includes("<item")) { xml = text; break; }
+    } catch (e) { lastErr = e; }
+  }
+  if (!xml) throw lastErr || new Error("フィードを取得できませんでした");
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  return [...doc.querySelectorAll("item")].slice(0, 12).map(it => {
+    const raw = it.querySelector("title")?.textContent || "";
+    const src = it.querySelector("source")?.textContent || "";
+    const title = src && raw.endsWith(" - " + src) ? raw.slice(0, raw.length - src.length - 3) : raw;
+    return {
+      t: title,
+      time: timeAgo(it.querySelector("pubDate")?.textContent || ""),
+      src,
+      r: FOREIGN_RE.test(src) ? "海外" : "国内",
+      u: it.querySelector("link")?.textContent || "",
+    };
+  });
+}
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function render() {
+  const g = GENRES.find(x => x.id === state.active);
+  // タブ
+  document.getElementById("tabs").innerHTML = GENRES.map(x =>
+    `<button class="tab${x.id === state.active ? " active" : ""}" data-id="${x.id}"
+       style="${x.id === state.active ? `color:${x.color};border-bottom-color:${x.color}` : ""}">${x.label}</button>`
+  ).join("");
+  // 絞り込みチップ
+  document.getElementById("chips").innerHTML = REGIONS.map(r =>
+    `<button class="chip" data-r="${r}" style="${r === state.region ? `background:${g.color};color:#fff;border-color:${g.color}` : ""}">${r}</button>`
+  ).join("");
+  // 本体
+  const box = document.getElementById("content");
+  const entry = state.store[state.active];
+  document.getElementById("updated").textContent = entry ? entry.updatedAt + " 更新" : "";
+  document.getElementById("refresh").disabled = state.loading;
+
+  if (state.loading) {
+    box.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      <p class="state">「${g.label}」の最新ニュースを取得しています…</p>`;
+    return;
+  }
+  if (entry && entry.error) {
+    box.innerHTML = `<div class="state">取得できませんでした：${esc(entry.error)}<br>
+      <button id="retry">もう一度試す</button></div>`;
+    document.getElementById("retry").onclick = () => load(state.active, true);
+    return;
+  }
+  if (!entry) { load(state.active); return; }
+
+  const items = entry.items.filter(it => state.region === "すべて" || it.r === state.region);
+  if (!items.length) {
+    box.innerHTML = `<p class="state">この絞り込みに合う記事がありません。「すべて」に戻すか、最新に更新してください。</p>`;
+    return;
+  }
+  box.innerHTML = items.map(it => `
+    <article class="card">
+      <div class="vtag" style="${it.r === "海外"
+        ? `background:${g.color};color:#fff;border-right:1px solid ${g.color}`
+        : `background:#fff;color:${g.color};border-right:1px solid ${g.color}`}">${it.r}</div>
+      <div class="card-body">
+        <h2>${it.u ? `<a href="${esc(it.u)}" target="_blank" rel="noopener noreferrer">${esc(it.t)}</a>` : esc(it.t)}</h2>
+        <p class="fresh">${esc(it.time)}</p>
+        <p class="meta">${esc(it.src)}${it.u ? `<a href="${esc(it.u)}" target="_blank" rel="noopener noreferrer" style="color:${g.color}">元記事へ →</a>` : ""}</p>
+      </div>
+    </article>`).join("");
+}
+
+async function load(id, force) {
+  if (state.store[id] && !force && !state.store[id].error) { render(); return; }
+  state.loading = true; render();
+  try {
+    const g = GENRES.find(x => x.id === id);
+    const items = await fetchItems(g);
+    const now = new Date();
+    state.store[id] = {
+      items,
+      updatedAt: now.getHours() + ":" + String(now.getMinutes()).padStart(2, "0"),
+    };
+  } catch (e) {
+    state.store[id] = { error: (e && e.message) || "不明なエラー", items: [] };
+  } finally {
+    state.loading = false; render();
+  }
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  state.active = b.dataset.id; render();
+  if (!state.store[state.active]) load(state.active);
+});
+document.getElementById("chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  state.region = b.dataset.r; render();
+});
+document.getElementById("refresh").addEventListener("click", () => load(state.active, true));
+
+load("top");
+
+// PWA: サービスワーカー登録（対応環境のみ・失敗しても本体動作に影響なし）
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
