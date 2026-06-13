@@ -123,6 +123,7 @@
 <script>
 const GENRES = [
   { id: "top",      label: "総合",     topic: null,            color: "#19324F" },
+  { id: "xtrend",   label: "Xトレンド", x: true,               color: "#1A1A1A" },
   { id: "domestic", label: "国内",     topic: "NATION",        color: "#2D5F4E" },
   { id: "world",    label: "国際",     topic: "WORLD",         color: "#6A4C93" },
   { id: "kyoto",    label: "京都",     geo: "京都",            color: "#6B7C3A" },
@@ -131,6 +132,7 @@ const GENRES = [
   { id: "sports",   label: "スポーツ", topic: "SPORTS",        color: "#A8442E" },
   { id: "ent",      label: "エンタメ", topic: "ENTERTAINMENT", color: "#9C3D63" },
 ];
+const TRENDS_URL = "https://naigai-trends.atsun443629.workers.dev";
 const REGIONS = ["すべて", "国内", "海外"];
 const PROXIES = [
   u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
@@ -188,6 +190,29 @@ async function fetchItems(url) {
   });
 }
 
+async function fetchXTrends() {
+  const res = await fetch(TRENDS_URL);
+  if (!res.ok) {
+    let msg = "トレンドサーバーに接続できませんでした (HTTP " + res.status + ")";
+    try { const j = await res.json(); if (j.error) msg = j.error; } catch (e) {}
+    throw new Error(msg);
+  }
+  const j = await res.json();
+  const toItem = (t, i, region) => ({
+    t: (i + 1) + "位　" + t.name,
+    time: t.count ? "約" + Number(t.count).toLocaleString() + "件の投稿" : "",
+    src: region === "国内" ? "X トレンド（日本）" : "X トレンド（世界）",
+    r: region,
+    u: "https://x.com/search?q=" + encodeURIComponent(t.name),
+  });
+  const items = [
+    ...(j.jp || []).slice(0, 10).map((t, i) => toItem(t, i, "国内")),
+    ...(j.world || []).slice(0, 10).map((t, i) => toItem(t, i, "海外")),
+  ];
+  if (!items.length) throw new Error("トレンドが取得できませんでした");
+  return items;
+}
+
 function esc(s) {
   return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 }
@@ -210,9 +235,11 @@ function render() {
     return `<button class="tab${on ? " active" : ""}" data-id="${x.id}"
        style="${on ? `color:${x.color};border-bottom-color:${x.color}` : ""}">${x.label}</button>`;
   }).join("");
-  // 絞り込みチップ
+  // 絞り込みチップ（Xトレンドでは「国内→日本」「海外→世界」と表示）
+  const isX = state.mode === "genre" && GENRES.find(x => x.id === state.active).x;
+  const chipLabel = r => isX ? (r === "国内" ? "日本" : r === "海外" ? "世界" : r) : r;
   document.getElementById("chips").innerHTML = REGIONS.map(r =>
-    `<button class="chip" data-r="${r}" style="${r === state.region ? `background:${color};color:#fff;border-color:${color}` : ""}">${r}</button>`
+    `<button class="chip" data-r="${r}" style="${r === state.region ? `background:${color};color:#fff;border-color:${color}` : ""}">${chipLabel(r)}</button>`
   ).join("");
   // 本体
   const box = document.getElementById("content");
@@ -274,10 +301,13 @@ async function load(force) {
   if (state.store[key] && !force && !state.store[key].error) { render(); return; }
   state.loading = true; render();
   try {
-    const url = state.mode === "search"
-      ? searchUrl(state.query)
-      : feedUrl(GENRES.find(x => x.id === state.active));
-    const items = await fetchItems(url);
+    let items;
+    if (state.mode === "search") {
+      items = await fetchItems(searchUrl(state.query));
+    } else {
+      const g = GENRES.find(x => x.id === state.active);
+      items = g.x ? await fetchXTrends() : await fetchItems(feedUrl(g));
+    }
     const now = new Date();
     state.store[key] = {
       items,
